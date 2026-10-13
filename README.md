@@ -2,6 +2,8 @@
 
 A browser-based solver and visualizer for the lockpicking puzzles in **Gothic 1 Remake**.
 
+**[🌐 Launch Gothic Lock Solver](https://dani4-dev.github.io/gothic-lock-solver/)** — use the app directly in your browser.
+
 Set the number of plates, describe which plates move together, and select their starting pin positions. The application searches for a sequence of moves that places every pin in the center hole, then lets you watch the lock open one step at a time.
 
 **No installation, backend, or internet connection required.** Everything runs locally in a single HTML page.
