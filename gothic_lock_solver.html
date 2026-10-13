@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Gothic 1 Remake — Lock Puzzle Solver</title>
+  <style>
+    :root {
+      --bg: #10131b;
+      --panel: #1b202b;
+      --panel-alt: #202633;
+      --panel-hover: #2b3444;
+      --border: #343c4b;
+      --text: #ebeff6;
+      --muted: #a2afc1;
+      --gold: #f2c878;
+      --gold-wash: rgba(242,200,120,.14);
+      --green: #83d8aa;
+      --green-wash: rgba(71,169,112,.16);
+      --red: #f6a39c;
+      --red-wash: rgba(232,99,99,.10);
+      --radius: 13px;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible + span, .pin-choice:focus-within {
+      outline: 2px solid var(--gold); outline-offset: 2px;
+    }
+    .shell { max-width: 1500px; min-height: 100dvh; padding: 15px 18px 16px; margin: auto; display: flex; flex-direction: column; gap: 12px; }
+    .app-header { display:flex; align-items: center; justify-content: space-between; gap:12px; flex:none; min-height: 46px; }
+    .heading { display: flex; align-items: center; gap: 11px; min-width:0; }
+    .glyph { display:grid; place-items:center; width:39px; height:39px; border:1px solid #6f634d; background: var(--gold-wash); border-radius:11px; color: var(--gold); font-size: 24px; flex:none; }
+    h1 { font-size: 20px; margin: 0 0 3px; line-height: 1.1; font-weight: 750; letter-spacing: -.02em; }
+    .subtitle { color:var(--muted); font-size:12px; }
+    .local-chip { white-space: nowrap; color:var(--muted); font-size: 11px; border: 1px solid var(--border); border-radius: 99px; padding: 7px 10px; }
+    .workspace { display:grid; grid-template-rows: auto auto; gap: 12px; flex:1; min-height:0; }
+    .upper { display:grid; grid-template-columns: minmax(480px, 1.37fr) minmax(350px, 1fr); gap:12px; min-height:345px; }
+    .lower { display:grid; grid-template-columns: minmax(0, 1fr) minmax(442px, .77fr); align-items:stretch; gap:12px; min-width:0; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); min-height:0; display:flex; flex-direction: column; overflow: hidden; }
+    .panel-header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:9px; padding:12px 14px; border-bottom:1px solid var(--border); flex:none; }
+    h2 { font-size:14px; font-weight:750; margin:0; }
+    .small-label { color:var(--muted); font-size:11px; }
+    .count-box { display:flex; align-items:center; gap:8px; font-size:12px; color: var(--muted); }
+    .count-stepper { display:flex; align-items:center; gap:4px; }
+    .count-stepper .btn { width:29px; height:29px; display:grid; place-items:center; padding:0; font-size:17px; line-height:1; }
+    .count-input { width:45px; height:29px; text-align:center; font-size:13px; font-weight:750; color:var(--gold); border:1px solid #a9854c; border-radius:6px; background:var(--gold-wash); appearance:textfield; -moz-appearance:textfield; }
+    .count-input::-webkit-inner-spin-button, .count-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+    .segmented { display:flex; gap:3px; }
+    .segmented label, .radio-pill { position:relative; display:inline-flex; align-items:center; justify-content:center; user-select:none; cursor:pointer; }
+    .segmented input, .radio-pill input { position:absolute; opacity:0; width:1px; height:1px; }
+    .segmented span { display:grid; place-items:center; width:31px; height:28px; border-radius:6px; border:1px solid var(--border); color:var(--text); font-weight:700; }
+    .segmented input:checked + span { background: var(--gold-wash); color:var(--gold); border-color:#a9854c; }
+    .segmented input:focus-visible + span { outline:2px solid var(--gold); outline-offset: 2px; }
+    .config-scroll { overflow-y:auto; overflow-x:hidden; max-height:510px; padding: 4px 13px 9px; flex:1; scrollbar-color: #526073 transparent; scrollbar-width:thin; }
+    .plate-item { padding: 3px 7px; border-bottom:1px solid rgba(125,146,177,.17); border-radius:7px; transition:background-color 120ms ease; }
+    .plate-item.is-edited { background:rgba(71,169,112,.12); }
+    .plate-item.is-edited .plate-number { color:#a2eabe; background:rgba(71,169,112,.20); }
+    .config-tools { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:9px; }
+    .reset-connections { color:var(--green); border-color:rgba(131,216,170,.42); }
+    .reset-connections:hover:not(:disabled) { background:var(--green-wash); }
+    .plate-item:last-child { border-bottom:0; }
+    .plate-heading { display:flex; align-items:center; gap:6px; min-height:28px; flex-wrap:wrap; }
+    .plate-heading > .edge-row { flex:1 1 350px; min-width:0; }
+    .plate-number { color:var(--gold); display:grid; place-items:center; width:24px; height:24px; border-radius:6px; background:var(--gold-wash); font-size:13px; font-weight:750; flex:none; }
+    .plate-title { font-size:12px; font-weight:700; white-space:nowrap; }
+    .plate-hint { color:var(--muted); font-size:11px; }
+    .spacer { flex:1; }
+    .btn { border:1px solid var(--border); color:var(--text); background:var(--panel-alt); border-radius:8px; padding:8px 12px; font-size:12px; font-weight:650; white-space:nowrap; }
+    .btn:hover:not(:disabled) { background:var(--panel-hover); border-color:#65728a; }
+    .btn:disabled { opacity:.38; cursor:not-allowed; }
+    .btn-small { padding:5px 9px; font-size:11px; }
+    .btn-primary { background:var(--gold); color:#1c1b18; border-color:var(--gold); font-weight:800; }
+    .btn-primary:hover:not(:disabled) { background:#ffdb91; border-color:#ffdb91; }
+    .edge-list { padding: 1px 0 0 42px; }
+    .edge-list:empty { display:none; }
+    .edge-row { display:flex; align-items:center; gap:6px; min-height:27px; padding:1px 0; flex-wrap:wrap; }
+    .edge-lead { color:#77869b; font-size:13px; flex:none; }
+    .edge-group { display:flex; align-items:center; gap:3px; flex-wrap:wrap; }
+    .target-pill span { display:grid; place-items:center; width:24px; height:25px; border:1px solid var(--border); border-radius:5px; font-size:11px; font-weight:700; background:var(--panel-alt); }
+    .target-pill input:checked + span { background:var(--gold-wash); color:var(--gold); border-color:#a9854c; }
+    .target-pill input:focus-visible + span, .direction-pill input:focus-visible + span { outline:2px solid var(--gold); outline-offset:2px; }
+    .direction-pill span { padding:5px 7px; display:block; border:1px solid var(--border); background:var(--panel-alt); border-radius:5px; color:var(--muted); font-size:10px; white-space:nowrap; }
+    .direction-pill input:checked + span { background:var(--gold-wash); color:var(--gold); border-color:#a9854c; }
+    .direction-pill.opposite input:checked + span { background:rgba(139,183,245,.13); color:#b4d1fa; border-color:#6a8bb7; }
+    .remove-edge[hidden] { display:none; }
+    .remove-edge { border:0; background:transparent; color:var(--muted); border-radius:5px; font-size:18px; padding:0px 6px; line-height:24px; }
+    .remove-edge:hover { color:var(--red); background:var(--red-wash); }
+    .empty-link { font-size:11px; color:var(--muted); white-space:nowrap; }
+    .pins-inner { padding:8px 12px 0; flex:1; min-height:0; overflow-y:auto; }
+    .pins-grid { display:grid; grid-template-columns: 47px repeat(7,minmax(29px,1fr)); align-items:center; gap:3px; }
+    .pin-head { height:22px; font-size:11px; font-weight:700; color:var(--muted); display:grid; place-items:center; }
+    .center-head { color:var(--gold); }
+    .pin-label { font-weight:750; color:var(--text); font-size:12px; text-align:center; }
+    .pin-choice { height:30px; border-radius:7px; display:grid; place-items:center; cursor:pointer; position:relative; border:1px solid transparent; }
+    .pin-choice:hover { background:var(--panel-hover); }
+    .pin-choice.center-pos { background:rgba(242,200,120,.045); }
+    .pin-choice input { position:absolute; opacity:0; width: 20px; height:20px; cursor:pointer; margin:0; }
+    .pin-dot { display:block; width:17px; height:17px; border-radius:50%; border:2px solid #788598; background:transparent; }
+    .pin-choice input:checked + .pin-dot { border-color:var(--gold); box-shadow: inset 0 0 0 4px var(--panel), 0 0 0 1px var(--gold); background:var(--gold); }
+    .pins-note { padding: 6px 12px; font-size:11px; color:var(--muted); border-top: 1px solid var(--border); flex:none; }
+    .solution-header { gap:12px; }
+    .solution-panel { height:auto; min-height:0; }
+    .toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .status-line { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:8px 14px; color:var(--muted); font-size:12px; background:rgba(255,255,255,.012); border-bottom:1px solid var(--border); flex:none; }
+    .status-line.good { color:var(--green); background:var(--green-wash); }
+    .status-line.error { color:var(--red); background:var(--red-wash); }
+    .status-text { overflow-wrap:anywhere; }
+    .copy-btn { display:none; }
+    .copy-btn.visible { display:inline-block; }
+    .table-scroll { overflow-x:auto; overflow-y:visible; min-height:0; height:auto; max-height:none; flex:none; scrollbar-color: #526073 transparent; scrollbar-width:thin; }
+    table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+    thead th { position:sticky; top:0; text-align:left; background:var(--panel-alt); color:var(--muted); font-size:11px; font-weight:650; padding:9px 13px; z-index:1; border-bottom:1px solid var(--border); }
+    th:first-child, td:first-child { width:87px; }
+    th:nth-child(2), td:nth-child(2) { width:220px; }
+    td { padding:8px 13px; border-bottom: 1px solid rgba(125,146,177,.12); vertical-align:middle; }
+    tbody tr { cursor:pointer; }
+    tbody tr:hover { background:rgba(255,255,255,.04); }
+    tbody tr.selected { background:rgba(242,200,120,.11); }
+    tbody tr.final { color:var(--green); background:rgba(71,169,112,.10); }
+    tbody tr.final.selected { background:rgba(71,169,112,.19); }
+    .step-col { color:var(--muted); white-space:nowrap; }
+    .action-col { font-weight:700; white-space:nowrap; }
+    .state-numbers { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .state-numbers span { display:grid; place-items:center; width:25px; height:22px; border-radius:5px; background:#2a3443; color:var(--text); font-weight:750; font-size:11px; }
+    .state-numbers span.in-place { color:var(--green); background:rgba(79,168,115,.18); }
+    .empty-state { padding:24px 14px; color:var(--muted); font-size:12px; text-align:center; }
+    /* Live lock model. Original sprite sizes: 175 × 40 px. */
+    .visual-panel { min-width:0; }
+    .visual-body { padding:12px 14px 14px; }
+    .visual-hint { color:var(--muted); font-size:11px; }
+    .visual-board { position:relative; background:#f9f9f9; border:1px solid #727b8b; border-radius:10px; padding:52px 10px 9px; overflow-x:auto; scrollbar-color:#aab1be transparent; }
+    .playback-current { position:absolute; top:10px; right:10px; max-width:calc(100% - 20px); padding:7px 11px; color:#515e70; border:1px solid #cad0da; background:#edf0f6; border-radius:8px; text-align:right; font-weight:750; font-size:12px; white-space:nowrap; }
+    .playback-current.running { background:#fff1c9; border-color:#d6a647; color:#5f491d; }
+    .playback-current.unlocked { background:#dff4e6; border-color:#82bb98; color:#22613f; }
+    .playback-controls { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+    .playback-progress { color:var(--muted); font-size:11px; margin-top:10px; min-height:16px; }
+    .visual-panel .panel-header { gap:7px; }
+    .visual-headers { display:grid; grid-template-columns:28px 330px 34px; gap:7px; width:max-content; align-items:center; color:#657080; font-size:10px; font-weight:700; margin-bottom:4px; text-align:center; }
+    .visual-row { display:grid; grid-template-columns:28px 330px 34px; gap:7px; align-items:center; width:max-content; min-height:46px; margin:4px 0; }
+    .visual-label { display:grid; place-items:center; height:25px; width:25px; border-radius:6px; background:#e4e8ef; color:#344054; font-size:12px; font-weight:750; }
+    .visual-position { text-align:center; color:#344054; font-size:12px; font-weight:750; }
+    .visual-position.is-centered { color:#af3220; }
+    .visual-track { height:44px; width:330px; position:relative; overflow:hidden; }
+    .plate-art, .pin-art { position:absolute; left:50%; top:50%; width:175px; height:40px; }
+    /* The plate sits ABOVE the fixed pin; Multiply makes white pixels in the
+       foreground plate sprite reveal the pin below, even with opaque PNGs. */
+    .visual-track { isolation:isolate; }
+    .plate-art { z-index:3; transform:translate(calc(-50% + var(--plate-offset, 0px)), -50%); transition:transform 360ms ease-in-out; mix-blend-mode:multiply; }
+    .pin-art { z-index:2; transform:translate(-50%, -50%); pointer-events:none; }
+    .plate-sprite, .pin-sprite { display:block; width:175px; height:40px; position:absolute; inset:0; max-width:none; image-rendering:pixelated; }
+    .plate-fallback { width:175px; height:40px; border:2px solid #101010; display:flex; align-items:center; justify-content:space-evenly; background:#fff; }
+    .plate-fallback span { border:2px solid #101010; width:22px; height:22px; flex:none; border-radius:50%; background:transparent; }
+    .visual-stack-instant .plate-art { transition:none !important; }
+    .pin-fallback { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:23px; height:23px; border-radius:50%; background:#ffe500; }
+    .pin-fallback.is-centered { background:#eb3c23; }
+    .visual-legend { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:11px; }
+    .legend-item { display:inline-flex; align-items:center; gap:6px; }
+    .legend-dot { width:11px; height:11px; display:inline-block; border-radius:50%; background:#ffe500; flex:none; }
+    .legend-dot.centered { background:#eb3c23; }
+    .asset-note { color:var(--muted); margin-top:9px; font-size:10px; line-height:1.5; }
+    .asset-note[hidden] { display:none; }
+    @media (prefers-reduced-motion: reduce) { .plate-art { transition:none; } }
+
+    .footnote { color:#8695a8; font-size:10px; text-align:right; flex:none; }
+    @media (max-width: 950px) {
+      .shell { height:auto; min-height:100dvh; }
+      .workspace { display:flex; flex-direction:column; }
+      .upper, .lower { display:flex; flex-direction:column; }
+      .config-panel { min-height:280px; max-height:none; }
+      .pins-panel { min-height:310px; }
+      .solution-panel { min-height:0; }
+      .table-scroll { max-height:none; }
+    }
+    @media (max-width: 520px) {
+      .shell { padding:10px; gap:9px; }
+      .local-chip { display:none; }
+      .app-header h1 { font-size:17px; }
+      .panel-header { padding:10px; }
+      .config-scroll { padding: 4px 9px; }
+      .edge-row { gap:4px; flex-wrap:wrap; }
+      .edge-list { padding-left:11px; }
+      .plate-heading { flex-wrap:wrap; }
+      .plate-heading > .edge-row { flex-basis:100%; }
+      .target-pill span { width:25px; }
+      .pins-inner { padding:10px 5px; }
+      .pins-grid { grid-template-columns:30px repeat(7,minmax(29px,1fr)); gap:1px; }
+      .toolbar { width:100%; }
+      .toolbar .btn { flex:1; }
+      th:nth-child(2), td:nth-child(2) { width:135px; }
+      th:first-child, td:first-child { width:72px; }
+      .state-numbers { gap:3px; }
+      .state-numbers span { width:21px; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="app-header">
+    <div class="heading">
+      <div class="glyph" aria-hidden="true">⚿</div>
+      <div>
+        <h1>Gothic 1 Remake · Lock Puzzle Solver</h1>
+        <div class="subtitle">Configure 4–12 plates, find the shortest route, and watch the lock open</div>
+      </div>
+    </div>
+    <div class="local-chip">Works offline · HTML + local assets</div>
+  </header>
+
+  <main class="workspace">
+    <div class="upper">
+      <section class="panel config-panel" aria-labelledby="config-title">
+        <div class="panel-header">
+          <h2 id="config-title">Lock Configuration</h2>
+          <div class="config-tools">
+            <button class="btn btn-small reset-connections" id="reset-connections-btn" type="button" title="Clear all plate links without changing pin positions or plate count">↻ Reset Connections</button>
+            <div class="count-box">
+              <span>Plates</span>
+              <div class="count-stepper" id="count-controls" aria-label="Number of plates">
+                <button type="button" class="btn" id="count-minus" aria-label="Remove one plate" title="Remove one plate">−</button>
+                <input id="count-input" class="count-input" type="number" min="4" max="12" step="1" value="5" aria-label="Number of plates (4 to 12)">
+                <button type="button" class="btn" id="count-plus" aria-label="Add one plate" title="Add one plate">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="config-scroll" id="plates-list" aria-label="Plate connections"></div>
+      </section>
+
+      <section class="panel pins-panel" aria-labelledby="pins-title">
+        <div class="panel-header">
+          <h2 id="pins-title">Pin Positions</h2>
+          <span class="small-label">Goal: all pins in position 4</span>
+        </div>
+        <div class="pins-inner"><div id="pins-grid" class="pins-grid"></div></div>
+        <div class="pins-note">Select the current pin position for each plate.</div>
+      </section>
+    </div>
+
+    <div class="lower">
+    <section class="panel solution-panel" aria-labelledby="solution-title">
+      <div class="panel-header solution-header">
+        <h2 id="solution-title">Solution</h2>
+        <div class="toolbar">
+          <button class="btn" id="example-btn" type="button">Example</button>
+          <button class="btn" id="reset-btn" type="button" title="Reset connections and pin positions">Reset All</button>
+          <button class="btn btn-primary" id="solve-btn" type="button">Solve Lock →</button>
+        </div>
+      </div>
+      <div class="status-line" id="status" role="status" aria-live="polite">
+        <span class="status-text" id="status-text">Set up plate connections and click “Solve Lock”.</span>
+        <button class="btn btn-small copy-btn" id="copy-btn" type="button">Copy Solution</button>
+      </div>
+      <div class="table-scroll" id="table-scroll">
+        <table aria-label="Step-by-step solution">
+          <thead><tr><th>Step</th><th>Action</th><th>Pin positions (1–6)</th></tr></thead>
+          <tbody id="solution-body"></tbody>
+        </table>
+        <div class="empty-state" id="empty-state">Your solution table will appear here, showing the starting state and pin positions after each step.</div>
+      </div>
+    </section>
+
+      <section class="panel visual-panel" aria-labelledby="visual-title">
+        <div class="panel-header">
+          <h2 id="visual-title">Lock Visualization</h2>
+          <div class="playback-controls">
+            <button class="btn btn-small btn-primary" id="play-btn" type="button" disabled>▶ Play Solution</button>
+            <button class="btn btn-small" id="step-btn" type="button" disabled>▷ Play Step</button>
+            <button class="btn btn-small" id="replay-btn" type="button" disabled>↻ Replay</button>
+          </div>
+        </div>
+        <div class="visual-body">
+          <div class="visual-board" aria-label="Visual representation of the lock">
+            <div class="playback-current" id="playback-current" role="status" aria-live="polite">Live preview</div>
+            <div class="visual-headers"><span>Plate</span><span>Seven-hole plates and fixed pins</span><span>Pos.</span></div>
+            <div id="visual-stack"></div>
+          </div>
+          <div class="playback-progress" id="playback-progress">Adjust Pin Positions to update this model.</div>
+          <div class="visual-legend">
+            <span class="legend-item"><span class="legend-dot"></span>Not centered</span>
+            <span class="legend-item"><span class="legend-dot centered"></span>Centered (position 4)</span>
+          </div>
+          <div class="asset-note" id="asset-note" hidden>
+            Built-in preview is shown because one or more images could not load.
+            For your custom sprites, place <code>lock.png</code>, <code>yellow.png</code>,
+            and <code>red.png</code> in an <code>assets</code> folder next to this HTML file.
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <div class="footnote">4–12 plates · Linked plates move simultaneously, without chain reactions · Pins must remain within positions 1–7. Complex large locks may reach the search limit.</div>
+</div>
+<script>
+'use strict';
+
+const MIN_PLATES = 4;
+const MAX_PLATES = 12;
+const STORAGE_KEY = 'gothic-lock-solver-v1';
+const $ = id => document.getElementById(id);
+const range = n => Array.from({length:n}, (_,i) => i+1);
+let rowSerial = 0;
+let resultRows = null;
+let resultMoves = 0;
+let resultActions = null;   // Original individual moves, including linked plate deltas.
+let playbackTimer = null;
+let playbackGeneration = 0;
+let playbackRunning = false;
+let playbackPositions = null; // Current animated pin positions; input Pin Positions never changes.
+let playbackMoveIndex = 0; // Next atomic move to animate.
+let playbackStepIndex = 0; // Number of completed/started grouped solution rows.
+let solveGeneration = 0;
+let searchActive = false;
+const PLAYBACK_INTERVAL_MS = 580;  // Slightly longer than CSS transition (360 ms).
+
+function defaultModel(count=5) {
+  return { count, pins: Array(count).fill(4), edges: Array.from({length:count}, () => [{to:0,direction:'same',id:++rowSerial}]) };
+}
+
+function safeLoad() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!raw || !Number.isInteger(raw.count) || raw.count < MIN_PLATES || raw.count > MAX_PLATES || !Array.isArray(raw.pins) || !Array.isArray(raw.edges)) return null;
+    const count = raw.count;
+    const pins = range(count).map((_,i) => Number.isInteger(raw.pins[i]) && raw.pins[i] >= 1 && raw.pins[i] <= 7 ? raw.pins[i] : 4);
+    const edges = range(count).map((self,i) => {
+      let seen = new Set();
+      const list = Array.isArray(raw.edges[i]) ? raw.edges[i] : [];
+      const valid = list.filter((e,j) => e && Number.isInteger(e.to) && ((j===0 && e.to===0) || (e.to>=1 && e.to<=count && e.to!==self && !seen.has(e.to) && seen.add(e.to))) && ['same','opposite'].includes(e.direction))
+        .map(e => ({to:e.to, direction:e.direction, id:++rowSerial}));
+      return valid.length ? valid : [{to:0,direction:'same',id:++rowSerial}];
+    });
+    return {count,pins,edges};
+  } catch (_) { return null; }
+}
+
+let model = safeLoad() || defaultModel();
+
+function persist() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(model)); } catch (_) { /* private browsing etc. */ }
+}
+
+function setStatus(message, kind='') {
+  $('status').className = `status-line ${kind}`;
+  $('status-text').textContent = message;
+}
+
+function clearSolution(message='Settings changed. Click “Solve Lock” to calculate a new solution.') {
+  cancelSearch();
+  stopPlayback();
+  resultRows = null;
+  resultMoves = 0;
+  resultActions = null;
+  $('play-btn').disabled = true;
+  $('step-btn').disabled = true;
+  $('replay-btn').disabled = true;
+  setPlaybackDisplay('Live preview', 'Adjust Pin Positions to update this model.');
+  $('solution-body').replaceChildren();
+  $('empty-state').hidden = false;
+  $('empty-state').textContent = 'The step-by-step solution and pin positions will appear here.';
+  $('copy-btn').classList.remove('visible');
+  setStatus(message);
+}
+
+function inputsChanged() { persist(); clearSolution(); }
+
+function renderCount() {
+  $('count-input').value = String(model.count);
+  document.querySelector('thead th:last-child').textContent = `Pin positions (1–${model.count})`;
+  $('count-minus').disabled = model.count <= MIN_PLATES;
+  $('count-plus').disabled = model.count >= MAX_PLATES;
+}
+
+function makeRadioPill(groupName, value, text, checked, onChange, className='target-pill') {
+  const label = document.createElement('label');
+  label.className = `radio-pill ${className}`;
+  const input = document.createElement('input');
+  input.type = 'radio';
+  input.name = groupName;
+  input.value = String(value);
+  input.checked = checked;
+  input.addEventListener('change', () => { if (input.checked) onChange(); });
+  const span = document.createElement('span');
+  span.textContent = text;
+  label.append(input, span);
+  return label;
+}
+
+// A plate is highlighted whenever its connections differ from the blank defaults.
+function plateIsEdited(plateIndex) {
+  const rows = model.edges[plateIndex];
+  return rows.length !== 1 || rows.some(edge => edge.to !== 0 || edge.direction !== 'same');
+}
+function updatePlateHighlight(plateIndex) {
+  const row = $('plates-list').querySelector(`.plate-item[data-plate="${plateIndex}"]`);
+  if (row) row.classList.toggle('is-edited', plateIsEdited(plateIndex));
+}
+
+function resetConnections() {
+  model.edges = Array.from({length:model.count}, () => [
+    {to:0, direction:'same', id:++rowSerial}
+  ]);
+  renderPlates();
+  inputsChanged();
+}
+
+function renderEdges(plateIndex, container) {
+  const current = model.edges[plateIndex];
+  container.replaceChildren();
+  if (!current.length) {
+    const hint = document.createElement('div');
+    hint.className = 'empty-link';
+    hint.textContent = 'Moves independently';
+    container.append(hint);
+    return;
+  }
+  for (const edge of current) {
+    const edgeRow = document.createElement('div');
+    edgeRow.className = 'edge-row';
+    const lead = document.createElement('span');
+    lead.className = 'edge-lead';
+    lead.textContent = '↳';
+    const isPrimary = current[0] === edge;
+    const options = document.createElement('div');
+    options.className = 'edge-group';
+    options.setAttribute('role', 'radiogroup');
+    options.setAttribute('aria-label', `Plate ${plateIndex+1}: linked plate`);
+    for (let target = isPrimary ? 0 : 1; target <= model.count; target++) {
+      if (target === plateIndex+1) continue;
+      const button = makeRadioPill(`target-${edge.id}`, target, target === 0 ? '_' : String(target), edge.to === target,
+        () => { edge.to = target; updatePlateHighlight(plateIndex); inputsChanged(); }, 'target-pill');
+      button.title = target === 0 ? 'No linked plates (independent movement)' : `Link to plate ${target}`;
+      options.append(button);
+    }
+    const directions = document.createElement('div');
+    directions.className = 'edge-group';
+    directions.setAttribute('role', 'radiogroup');
+    directions.setAttribute('aria-label', 'Linked plate direction');
+    directions.append(
+      makeRadioPill(`dir-${edge.id}`, 'same', '= Same', edge.direction === 'same',
+        () => { edge.direction = 'same'; updatePlateHighlight(plateIndex); inputsChanged(); }, 'direction-pill'),
+      makeRadioPill(`dir-${edge.id}`, 'opposite', '↔ Opposite', edge.direction === 'opposite',
+        () => { edge.direction = 'opposite'; updatePlateHighlight(plateIndex); inputsChanged(); }, 'direction-pill opposite')
+    );
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'remove-edge';
+    if (isPrimary) remove.hidden = true; // The primary row already has the '—' option.
+    remove.title = 'Remove connection';
+    remove.setAttribute('aria-label', `Remove connection to plate ${edge.to}`);
+    remove.textContent = '×';
+    remove.addEventListener('click', () => {
+      if (isPrimary) { edge.to=0; edge.direction='same'; }
+      else model.edges[plateIndex] = model.edges[plateIndex].filter(x => x.id !== edge.id);
+      renderPlates(); inputsChanged();
+    });
+    edgeRow.append(lead, options, directions, remove);
+    container.append(edgeRow);
+  }
+}
+
+function renderPlates() {
+  const list = $('plates-list');
+  const previousScroll = list.scrollTop;
+  list.replaceChildren();
+  for (let i = 0; i < model.count; i++) {
+    const item = document.createElement('div');
+    item.className = 'plate-item';
+    item.dataset.plate = String(i);
+    item.classList.toggle('is-edited', plateIsEdited(i));
+    const heading = document.createElement('div');
+    heading.className = 'plate-heading';
+    const number = document.createElement('span'); number.className='plate-number'; number.textContent=String(i+1);
+    const title = document.createElement('span'); title.className='plate-title'; title.textContent=`Plate ${i+1}`;
+    const spacer = document.createElement('div'); spacer.className='spacer';
+    const add = document.createElement('button'); add.type='button'; add.className='btn btn-small'; add.textContent='+ Add';
+    const edgeContainer = document.createElement('div'); edgeContainer.className='edge-list';
+    add.disabled = model.edges[i].filter(e => e.to!==0).length >= model.count-1;
+    add.title = 'Add another connection below this plate';
+    add.addEventListener('click', () => {
+      const used = new Set(model.edges[i].map(e => e.to));
+      const to = range(model.count).find(num => num !== i+1 && !used.has(num));
+      if (!to) return;
+      model.edges[i].push({ id:++rowSerial, to, direction:'same' });
+      renderPlates(); inputsChanged();
+    });
+    heading.append(number,title,spacer,add);
+    item.append(heading,edgeContainer);
+    renderEdges(i,edgeContainer);
+    // Keep the first link on the plate's own line; Add inserts further links below.
+    const firstRow = edgeContainer.querySelector('.edge-row') || edgeContainer.querySelector('.empty-link');
+    if (firstRow) heading.insertBefore(firstRow, spacer);
+    list.append(item);
+  }
+  list.scrollTop = previousScroll;
+}
+
+function renderPins() {
+  const grid = $('pins-grid');
+  grid.replaceChildren();
+  const label = document.createElement('div'); label.className='pin-head'; label.textContent='№'; grid.append(label);
+  for (const hole of range(7)) {
+    const el = document.createElement('div');
+    el.className='pin-head' + (hole === 4 ? ' center-head':'');
+    el.textContent = String(hole); grid.append(el);
+  }
+  // Match Lock Visualization: highest plate at the top, Plate 1 at the bottom.
+  // Keep the model indices and radio names unchanged so solver state stays correct.
+  for (let plate=model.count-1; plate>=0; plate--) {
+    const rowLabel = document.createElement('div'); rowLabel.className='pin-label'; rowLabel.textContent=String(plate+1); grid.append(rowLabel);
+    for (const hole of range(7)) {
+      const cell = document.createElement('label');
+      cell.className='pin-choice' + (hole === 4 ? ' center-pos':'');
+      cell.title=`Plate ${plate+1}, position ${hole}`;
+      const input = document.createElement('input');
+      input.type='radio'; input.name=`pin-${plate}`; input.value=String(hole);
+      input.checked = model.pins[plate] === hole;
+      input.setAttribute('aria-label', `Plate ${plate+1}, position ${hole}`);
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        model.pins[plate] = hole;
+        inputsChanged();
+      });
+      const dot = document.createElement('span'); dot.className='pin-dot';
+      cell.append(input,dot); grid.append(cell);
+    }
+  }
+}
+
+// Each sprite is a 175x40 image with its center at x=87.5.
+// The pin never moves; a plate shifts (4 - position) * 22px.
+// E.g., position 1 shifts right 66px; position 7 shifts left 66px.
+const PLATE_STEP_PX = 22;
+const LOCK_SPRITES = {
+  plate: 'assets/lock.png',
+  uncentered: 'assets/yellow.png',
+  centered: 'assets/red.png'
+};
+function makeSprite(className, path) {
+  const img = document.createElement('img');
+  img.className = className;
+  img.alt = '';
+  img.width = 175;
+  img.height = 40;
+  img.draggable = false;
+  img.addEventListener('error', () => {
+    img.style.display = 'none';
+    $('asset-note').hidden = false;
+  });
+  img.src = path;
+  return img;
+}
+function renderLockVisualization() {
+  const stack = $('visual-stack');
+  stack.replaceChildren();
+  // Show the highest-numbered plate at the top and Plate 1 at the bottom.
+  for (let i = model.count - 1; i >= 0; i--) {
+    const row = document.createElement('div');
+    row.className = 'visual-row';
+    row.dataset.plate = String(i);
+    row.setAttribute('role', 'group');
+
+    const label = document.createElement('span');
+    label.className = 'visual-label';
+    label.textContent = String(i + 1);
+
+    const track = document.createElement('div');
+    track.className = 'visual-track';
+    const plateArt = document.createElement('div');
+    plateArt.className = 'plate-art';
+    const plateFallback = document.createElement('div');
+    plateFallback.className = 'plate-fallback';
+    for (let hole = 0; hole < 7; hole++) plateFallback.append(document.createElement('span'));
+    plateArt.append(plateFallback, makeSprite('plate-sprite', LOCK_SPRITES.plate));
+
+    const pinArt = document.createElement('div');
+    pinArt.className = 'pin-art';
+    const pinFallback = document.createElement('div');
+    pinFallback.className = 'pin-fallback';
+    const pinSprite = makeSprite('pin-sprite', model.pins[i] === 4 ? LOCK_SPRITES.centered : LOCK_SPRITES.uncentered);
+    pinArt.append(pinFallback, pinSprite);
+    track.append(plateArt, pinArt);
+
+    const value = document.createElement('span');
+    value.className = 'visual-position';
+    row.append(label, track, value);
+    stack.append(row);
+  }
+  updateLockVisualization();
+}
+function updateLockVisualization(positions = model.pins) {
+  $('visual-stack').querySelectorAll('.visual-row').forEach(row => {
+    // The DOM order is reversed; never use the row index for state lookup.
+    const i = Number(row.dataset.plate);
+    const position = positions[i];
+    const centered = position === 4;
+    row.querySelector('.plate-art').style.setProperty('--plate-offset', `${(4-position)*PLATE_STEP_PX}px`);
+    const value = row.querySelector('.visual-position');
+    value.textContent = String(position);
+    value.classList.toggle('is-centered', centered);
+    row.querySelector('.pin-fallback').classList.toggle('is-centered', centered);
+    const sprite = row.querySelector('.pin-sprite');
+    const path = centered ? LOCK_SPRITES.centered : LOCK_SPRITES.uncentered;
+    if (sprite.getAttribute('src') !== path) {
+      sprite.style.display = 'block';
+      sprite.src = path;
+    }
+    row.setAttribute('aria-label', `Plate ${i+1}: pin at position ${position}${centered ? ', centered' : ''}`);
+  });
+}
+
+function changeCount(newCount) {
+  if (!Number.isFinite(newCount)) { renderCount(); return; }
+  newCount = Math.max(MIN_PLATES, Math.min(MAX_PLATES, Math.round(newCount)));
+  if (model.count === newCount) { renderCount(); return; }
+  const oldCount = model.count;
+  model.count = newCount;
+  model.pins = range(newCount).map((_,i) => i < oldCount ? model.pins[i] : 4);
+  model.edges = range(newCount).map((_,i) => {
+    if (i>=oldCount) return [{to:0,direction:'same',id:++rowSerial}];
+    const filtered=model.edges[i].filter(e => e.to<=newCount);
+    return filtered.length ? filtered : [{to:0,direction:'same',id:++rowSerial}];
+  });
+  renderAll(); inputsChanged();
+}
+
+// All moves have cost 1 and are reversible. Reverse BFS from the goal obtains
+// exact shortest distances. Dynamic programming then minimizes direction/plate
+// switching *among shortest solutions* so the resulting instructions stay compact.
+function buildMoves(count, edges) {
+  const weights = range(count).map((_,i) => 7**i);
+  const moves = [];
+  for (let plate=0; plate<count; plate++) {
+    for (const dir of [-1,1]) {
+      const delta = Array(count).fill(0);
+      delta[plate] = dir;
+      for (const edge of edges[plate]) {
+        if (edge.to===0) continue; // '_': only the selected plate moves
+        delta[edge.to-1] += (edge.direction === 'same' ? dir : -dir);
+      }
+      const touched = delta.map((d,i) => ({d,i,w:weights[i]})).filter(({d}) => d !== 0);
+      const offset = touched.reduce((sum,{d,w}) => sum+d*w,0);
+      moves.push({plate,dir, touched,offset});
+    }
+  }
+  return {moves,weights};
+}
+
+function encodeState(pins, weights) {
+  return pins.reduce((sum,p,i) => sum+(p-1)*weights[i],0);
+}
+function decodeState(index,count,weights) {
+  return weights.map(w => (Math.floor(index / w) % 7)+1);
+}
+function advanceState(state, action, backwards=false) {
+  const factor = backwards ? -1 : 1;
+  for (const {d,w} of action.touched) {
+    const digit = Math.floor(state/w)%7;
+    const moved = digit+d*factor;
+    if (moved < 0 || moved > 6) return -1;
+  }
+  return state + factor*action.offset;
+}
+function solveShortest(count, edges, pins) {
+  const {moves,weights} = buildMoves(count,edges);
+  const goal = encodeState(Array(count).fill(4),weights);
+  const start = encodeState(pins,weights);
+  if (goal === start) return [];
+  const total = 7**count;
+  const distance = new Int16Array(total);
+  distance.fill(-1);
+  const queue = new Int32Array(total);
+  let head=0,tail=1;
+  queue[0]=goal;
+  distance[goal]=0;
+  while (head < tail && distance[start] === -1) {
+    const state=queue[head++];
+    for (const action of moves) {
+      const prior = advanceState(state,action,true);
+      if (prior === -1 || distance[prior] !== -1) continue;
+      distance[prior] = distance[state]+1;
+      queue[tail++] = prior;
+    }
+  }
+  if (distance[start] === -1) return null;
+
+  // The depth strictly decreases on every recursion; memoization is acyclic.
+  const memo=new Map();
+  const choices=new Map();
+  function leastStages(state,last) {
+    if (state === goal) return 0;
+    const key=state*(moves.length+1)+(last+1);
+    if (memo.has(key)) return memo.get(key);
+    let best=Infinity, choice=-1;
+    for (let a=0; a<moves.length; a++) {
+      const next=advanceState(state,moves[a]);
+      if (next === -1 || distance[next] !== distance[state]-1) continue;
+      const stageCost=(a===last ? 0 : 1)+leastStages(next,a);
+      if (stageCost < best) { best=stageCost; choice=a; }
+    }
+    memo.set(key,best);
+    choices.set(key,choice);
+    return best;
+  }
+  leastStages(start,-1);
+  let state=start,last=-1;
+  const answer=[];
+  while (state !== goal) {
+    const chosen=choices.get(state*(moves.length+1)+(last+1));
+    if (chosen === undefined || chosen === -1) throw new Error('Unable to reconstruct solution');
+    answer.push(moves[chosen]);
+    state=advanceState(state,moves[chosen]);
+    last=chosen;
+  }
+  return answer;
+}
+
+// For 7–12 plates, explore from both ends instead of allocating 7^N states.
+// Search is performed in short, cancellable chunks so the browser remains responsive.
+// Every edge has cost 1. Expanding full BFS layers yields shortest paths.
+const SEARCH_STATE_LIMIT = 450000;
+const SEARCH_CHUNK_MS = 12;
+function cancelSearch() {
+  solveGeneration++;
+  searchActive = false;
+  $('solve-btn').textContent = 'Solve Lock →';
+  $('solve-btn').disabled = false;
+}
+function reconstructMeeting(meeting, forward, backward, moves) {
+  const left = [];
+  let state = meeting;
+  while (forward.get(state).parent !== null) {
+    const info = forward.get(state);
+    left.push(moves[info.action]);
+    state = info.parent;
+  }
+  left.reverse();
+  state = meeting;
+  while (backward.get(state).parent !== null) {
+    const info = backward.get(state);
+    left.push(moves[info.action]);
+    state = info.parent;
+  }
+  return left;
+}
+async function solveScalable(count, edges, pins, token) {
+  const {moves, weights} = buildMoves(count, edges);
+  const start = encodeState(pins, weights);
+  const goal = encodeState(Array(count).fill(4), weights);
+  if (start === goal) return {answer: []};
+  const forward = new Map([[start, {parent:null, action:-1, depth:0}]]);
+  const backward = new Map([[goal, {parent:null, action:-1, depth:0}]]);
+  let front = [start], back = [goal], frontDepth = 0, backDepth = 0;
+  let lastYield = performance.now();
+  while (front.length && back.length) {
+    if (token !== solveGeneration) return {cancelled:true};
+    const expandForward = front.length <= back.length;
+    const layer = expandForward ? front : back;
+    const current = expandForward ? forward : backward;
+    const other = expandForward ? backward : forward;
+    const newLayer = [];
+    const depth = (expandForward ? frontDepth : backDepth) + 1;
+    let bestMeeting = null, bestLength = Infinity, bestPathStages = Infinity;
+    for (const state of layer) {
+      for (let a=0; a<moves.length; a++) {
+        const next = advanceState(state, moves[a], !expandForward);
+        if (next === -1 || current.has(next)) continue;
+        current.set(next, {parent: state, action:a, depth});
+        newLayer.push(next);
+        const onOther = other.get(next);
+        if (onOther) {
+          const length = depth + onOther.depth;
+          if (length <= bestLength) {
+            const path = reconstructMeeting(next, forward, backward, moves);
+            let stages=0, previous=-1;
+            for (const action of path) {
+              const key = action.plate * 2 + (action.dir === 1 ? 1 : 0);
+              if (key !== previous) stages++;
+              previous=key;
+            }
+            if (length < bestLength || stages < bestPathStages) {
+              bestLength=length; bestPathStages=stages; bestMeeting=next;
+            }
+          }
+        }
+        if (current.size + other.size >= SEARCH_STATE_LIMIT) return {limited:true, visited:current.size+other.size};
+      }
+      if (performance.now() - lastYield > SEARCH_CHUNK_MS) {
+        setStatus(`Searching… ${Number(forward.size+backward.size).toLocaleString()} states checked · Cancel Search to stop.`);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (token !== solveGeneration) return {cancelled:true};
+        lastYield = performance.now();
+      }
+    }
+    if (bestMeeting !== null) return {answer: reconstructMeeting(bestMeeting, forward, backward, moves)};
+    if (expandForward) { front=newLayer; frontDepth=depth; }
+    else { back=newLayer; backDepth=depth; }
+    if (performance.now() - lastYield > SEARCH_CHUNK_MS) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (token !== solveGeneration) return {cancelled:true};
+      lastYield=performance.now();
+    }
+  }
+  return {answer:null};
+}
+
+// Disconnected groups of plates cannot affect one another. Solving them
+// separately is still globally optimal in number of moves, and can make even
+// a 12-plate lock inexpensive to solve.
+function connectedComponents(count, edges) {
+  const parent = range(count).map((_,i) => i);
+  function root(i) { while (parent[i] !== i) { parent[i]=parent[parent[i]]; i=parent[i]; } return i; }
+  for (let i=0;i<count;i++) for (const edge of edges[i]) {
+    if (edge.to === 0) continue;
+    const a=root(i), b=root(edge.to-1);
+    if (a !== b) parent[b]=a;
+  }
+  const groups=new Map();
+  for (let i=0;i<count;i++) {
+    const r=root(i);
+    if (!groups.has(r)) groups.set(r,[]);
+    groups.get(r).push(i);
+  }
+  return [...groups.values()];
+}
+async function solveWithComponents(count,edges,pins,token) {
+  const groups=connectedComponents(count,edges);
+  if (groups.length===1) return solveScalable(count,edges,pins,token);
+  const answer=[];
+  for (const group of groups) {
+    if (token !== solveGeneration) return {cancelled:true};
+    if (group.every(i=>pins[i]===4)) continue;
+    const indexes=new Map(group.map((global,local) => [global,local]));
+    const subEdges=group.map(global => edges[global].filter(e=>e.to !== 0).map(e => ({
+      to:indexes.get(e.to-1)+1, direction:e.direction
+    })));
+    const subPins=group.map(i=>pins[i]);
+    const result=group.length <= 6
+      ? {answer:solveShortest(group.length,subEdges,subPins)}
+      : await solveScalable(group.length,subEdges,subPins,token);
+    if (token !== solveGeneration) return {cancelled:true};
+    if (result.answer === null || result.limited || result.cancelled) return result;
+    for (const move of result.answer) {
+      answer.push({
+        plate:group[move.plate], dir:move.dir,
+        touched:move.touched.map(({i,d}) => ({i:group[i],d}))
+      });
+    }
+  }
+  return {answer};
+}
+
+function makeSolutionRows(initial,moveList) {
+  const rows=[{action:'—',pins:initial.slice()}];
+  let pins=initial.slice(), last=null, streak=0;
+  for (const move of moveList) {
+    if (last && (last.plate !== move.plate || last.dir !== move.dir)) {
+      rows.push({action:actionText(last,streak),pins:pins.slice()});
+      streak=0;
+    }
+    for (const {d,i} of move.touched) pins[i]+=d;
+    if (pins.some(p => p<1 || p>7)) throw new Error('Invalid move');
+    last=move;
+    streak++;
+  }
+  if (last) rows.push({action:actionText(last,streak),pins:pins.slice()});
+  return rows;
+}
+
+
+function actionText(move,num) {
+  // Moving the PIN to a higher-numbered hole slides the PLATE to the LEFT.
+  // Both the Solution table and the on-screen playback describe PLATE movement.
+  return `Plate ${move.plate+1} ${move.dir===1?'←':'→'} ×${num}`;
+}
+
+function renderSolution(rows,movesCount,actions) {
+  stopPlayback();
+  resultRows=rows;
+  resultMoves=movesCount;
+  resultActions=actions.slice();
+  $('play-btn').disabled = movesCount === 0;
+  $('step-btn').disabled = movesCount === 0;
+  $('replay-btn').disabled = true;
+  setPlaybackDisplay(movesCount ? 'Ready to play' : 'Unlocked ✓',
+    movesCount ? `Ready · ${movesCount} moves across ${rows.length-1} steps.` : 'All pins are already centered.',
+    movesCount ? '' : 'unlocked');
+  const body=$('solution-body');
+  body.replaceChildren();
+  document.querySelector('thead th:last-child').textContent=`Pin positions (1–${model.count})`;
+  rows.forEach((row,index) => {
+    const tr=document.createElement('tr');
+    if (index === rows.length-1) tr.classList.add('final');
+    const tdStep=document.createElement('td'); tdStep.className='step-col'; tdStep.textContent=index===0?'Start':String(index);
+    const tdAction=document.createElement('td'); tdAction.className='action-col'; tdAction.textContent=row.action;
+    const tdState=document.createElement('td');
+    const strip=document.createElement('div'); strip.className='state-numbers';
+    for (const pin of row.pins) {
+      const chip=document.createElement('span'); chip.className=pin===4?'in-place':''; chip.textContent=String(pin);
+      strip.append(chip);
+    }
+    tdState.append(strip);
+    tr.append(tdStep,tdAction,tdState);
+    tr.addEventListener('click', () => {
+      body.querySelectorAll('tr').forEach(item => item.classList.remove('selected'));
+      tr.classList.add('selected');
+    });
+    body.append(tr);
+  });
+  $('empty-state').hidden = true;
+  $('copy-btn').classList.add('visible');
+  setStatus(movesCount===0 ? 'All pins are already in position 4 — the lock is solved.' :
+    `✓ Shortest solution: ${movesCount} moves in ${rows.length-1} steps.`, 'good');
+  $('table-scroll').scrollTop=0;
+}
+
+function getConfigurationError() {
+  for (let i=0; i<model.count; i++) {
+    const used = new Set();
+    for (const edge of model.edges[i]) {
+      if (edge.to===0) continue;
+      if (edge.to===i+1 || edge.to<1 || edge.to>model.count) return `Invalid connection on plate ${i+1}.`;
+      if (used.has(edge.to)) return `Plate ${i+1} has duplicate connections to plate ${edge.to}. Remove one row.`;
+      used.add(edge.to);
+    }
+  }
+  return null;
+}
+
+async function onSolve() {
+  if (searchActive) {
+    cancelSearch();
+    setStatus('Search cancelled. Click “Solve Lock” to try again.');
+    return;
+  }
+  stopPlayback();
+  const issue=getConfigurationError();
+  if (issue) {
+    clearSolution(issue);
+    $('empty-state').textContent=issue;
+    setStatus(issue,'error');
+    return;
+  }
+  // Discard the previous solution before looking for a new one.
+  clearSolution('Finding a solution…');
+  const token = ++solveGeneration;
+  searchActive = true;
+  $('solve-btn').textContent = 'Cancel Search';
+  try {
+    // Give the browser a chance to paint the updated button and progress text.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (token !== solveGeneration) return;
+    const result = model.count <= 6
+      ? {answer:solveShortest(model.count,model.edges,model.pins)}
+      : await solveWithComponents(model.count,model.edges,model.pins,token);
+    if (token !== solveGeneration || result.cancelled) return;
+    cancelSearch();
+    if (result.limited) {
+      $('empty-state').textContent = `Search limit reached after ${result.visited.toLocaleString()} states. This lock may require a more advanced search; no conclusion about solvability was reached.`;
+      setStatus('Search limit reached — no solution confirmed. Try again with different settings.', 'error');
+      return;
+    }
+    if (result.answer === null) {
+      $('empty-state').textContent = 'Unable to reach the target (all 4s) with these rules. Check the connections and starting positions.';
+      setStatus('No solution exists for this configuration.', 'error');
+      return;
+    }
+    renderSolution(makeSolutionRows(model.pins,result.answer),result.answer.length,result.answer);
+  } catch (err) {
+    if (token !== solveGeneration) return;
+    console.error(err);
+    cancelSearch();
+    setStatus('An error occurred while solving. Check your configuration.','error');
+  }
+}
+
+// Lock animation runs through the exact atomic moves produced by the solver.
+// A grouped step (e.g. Plate 5 ← ×3) is displayed throughout its three moves.
+function setPlaybackDisplay(action, progress, state='') {
+  const badge = $('playback-current');
+  badge.textContent = action;
+  badge.className = 'playback-current' + (state ? ` ${state}` : '');
+  $('playback-progress').textContent = progress;
+}
+
+function updatePlaybackButtons() {
+  const hasSolution = !!(resultActions && resultActions.length);
+  const finished = hasSolution && playbackMoveIndex >= resultActions.length;
+  $('play-btn').disabled = !hasSolution || playbackRunning;
+  $('step-btn').disabled = !hasSolution || playbackRunning || finished;
+  $('replay-btn').disabled = !hasSolution || (playbackMoveIndex === 0 && !playbackRunning);
+}
+
+function stopPlayback() {
+  playbackGeneration++;
+  if (playbackTimer !== null) clearTimeout(playbackTimer);
+  playbackTimer = null;
+  playbackRunning = false;
+  playbackPositions = null;
+  playbackMoveIndex = 0;
+  playbackStepIndex = 0;
+  $('visual-stack').classList.remove('visual-stack-instant');
+  updateLockVisualization(model.pins);
+  $('solution-body').querySelectorAll('tr.selected').forEach(row => row.classList.remove('selected'));
+  updatePlaybackButtons();
+}
+
+function showPositionsInstantly(pins) {
+  const stack = $('visual-stack');
+  stack.classList.add('visual-stack-instant');
+  updateLockVisualization(pins);
+  // Flush the instant reset so the next frame animates from the initial state.
+  void stack.offsetWidth;
+  stack.classList.remove('visual-stack-instant');
+}
+
+function highlightSolutionStep(step) {
+  const rows = $('solution-body').querySelectorAll('tr');
+  rows.forEach(row => row.classList.remove('selected'));
+  const selected = rows[step]; // First row is Start; group 1 is row 1.
+  if (selected) selected.classList.add('selected');
+}
+
+function actionStartsGroup(index) {
+  if (index === 0) return true;
+  const previous = resultActions[index-1];
+  const current = resultActions[index];
+  return previous.plate !== current.plate || previous.dir !== current.dir;
+}
+
+function groupLengthAt(index) {
+  const current = resultActions[index];
+  let first = index;
+  while (first > 0 && !actionStartsGroup(first)) first--;
+  let end = index + 1;
+  while (end < resultActions.length &&
+    resultActions[end].plate === current.plate && resultActions[end].dir === current.dir) end++;
+  return end - first;
+}
+
+function finishPlayback() {
+  playbackRunning = false;
+  playbackTimer = null;
+  highlightSolutionStep(resultRows.length - 1);
+  setPlaybackDisplay('Unlocked ✓',
+    `Completed · ${resultActions.length} moves in ${resultRows.length-1} steps.`, 'unlocked');
+  updatePlaybackButtons();
+}
+
+// One step is one grouped table row, possibly made of several individual moves.
+// Play Step continues from the last paused position; Play Solution and Replay
+// instead begin at the original pin positions and run every step.
+function runPlayback(stepOnly, restart=false) {
+  if (!resultActions || !resultActions.length || !resultRows || playbackRunning) return;
+  if (restart) stopPlayback();
+  if (playbackMoveIndex >= resultActions.length) return;
+
+  const startingFresh = playbackPositions === null;
+  if (startingFresh) {
+    playbackPositions = model.pins.slice();
+    showPositionsInstantly(playbackPositions);
+    highlightSolutionStep(0);
+  }
+
+  playbackRunning = true;
+  const token = ++playbackGeneration;
+  const totalSteps = resultRows.length - 1;
+  const targetStep = stepOnly ? playbackStepIndex + 1 : totalSteps;
+  setPlaybackDisplay(stepOnly ? 'Playing next step…' : 'Playing solution…',
+    `Move ${playbackMoveIndex} / ${resultActions.length} · Step ${playbackStepIndex} / ${totalSteps}`, 'running');
+  updatePlaybackButtons();
+
+  function tick() {
+    if (token !== playbackGeneration) return; // Ignore stale timers after edits or Replay.
+    if (playbackMoveIndex >= resultActions.length) {
+      finishPlayback();
+      return;
+    }
+
+    const index = playbackMoveIndex;
+    const move = resultActions[index];
+    if (actionStartsGroup(index)) {
+      playbackStepIndex++;
+      highlightSolutionStep(playbackStepIndex);
+    }
+    const groupCount = groupLengthAt(index);
+    for (const {d,i} of move.touched) playbackPositions[i] += d;
+    if (playbackPositions.some(p => p < 1 || p > 7)) {
+      stopPlayback();
+      setPlaybackDisplay('Playback error', 'Move would exceed positions 1–7.');
+      return;
+    }
+    playbackMoveIndex++;
+    setPlaybackDisplay(actionText(move,groupCount),
+      `Move ${playbackMoveIndex} / ${resultActions.length} · Step ${playbackStepIndex} / ${totalSteps}`, 'running');
+    updateLockVisualization(playbackPositions);
+
+    // Wait for the CSS movement to finish, even after the final move of a step.
+    playbackTimer = setTimeout(() => {
+      if (token !== playbackGeneration) return;
+      if (playbackMoveIndex >= resultActions.length) {
+        finishPlayback();
+      } else if (stepOnly && playbackStepIndex >= targetStep && actionStartsGroup(playbackMoveIndex)) {
+        playbackRunning = false;
+        playbackTimer = null;
+        setPlaybackDisplay(resultRows[playbackStepIndex].action,
+          `Step ${playbackStepIndex} / ${totalSteps} complete · Press Play Step to continue.`);
+        updatePlaybackButtons();
+      } else {
+        tick();
+      }
+    }, PLAYBACK_INTERVAL_MS);
+  }
+
+  // Show the unchanged initial (or paused) state before moving the first plate.
+  playbackTimer = setTimeout(tick, startingFresh ? 400 : 120);
+}
+
+function playSolution() { runPlayback(false, true); }
+function playStep() { runPlayback(true, false); }
+
+function plainSolutionText() {
+  if (!resultRows) return '';
+  return [
+    `Gothic 1 Remake — Lock solution (${model.count} plates)`,
+    `Total: ${resultMoves} moves, ${resultRows.length-1} steps`,
+    '', 'Step | Action | Pin positions',
+    ...resultRows.map((row,i) => `${i===0?'Start':i} | ${row.action} | ${row.pins.join('-')}`)
+  ].join('\n');
+}
+async function copyText() {
+  const text=plainSolutionText();
+  if (!text) return;
+  try {
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+    else {
+      const t=document.createElement('textarea'); t.value=text; t.style.position='fixed'; t.style.opacity='0';
+      document.body.append(t);t.select();
+      if (!document.execCommand('copy')) throw new Error('Copy failed');
+      t.remove();
+    }
+    const btn=$('copy-btn'); const old=btn.textContent;
+    btn.textContent='Copied ✓';
+    setTimeout(() => btn.textContent=old,1600);
+  } catch (_) { setStatus('The browser blocked clipboard access. You can select and copy the table manually.', 'error'); }
+}
+
+function renderAll() { renderCount(); renderPlates(); renderPins(); renderLockVisualization(); }
+
+$('count-minus').addEventListener('click', () => changeCount(model.count - 1));
+$('count-plus').addEventListener('click', () => changeCount(model.count + 1));
+$('count-input').addEventListener('change', () => changeCount(Number($('count-input').value)));
+$('count-input').addEventListener('keydown', ev => {
+  if (ev.key === 'Enter') { ev.preventDefault(); $('count-input').blur(); }
+});
+$('solve-btn').addEventListener('click',onSolve);
+$('play-btn').addEventListener('click',playSolution);
+$('step-btn').addEventListener('click',playStep);
+$('replay-btn').addEventListener('click',playSolution);
+$('copy-btn').addEventListener('click',copyText);
+$('reset-connections-btn').addEventListener('click',resetConnections);
+$('reset-btn').addEventListener('click',() => { model=defaultModel(model.count);renderAll();inputsChanged(); });
+$('example-btn').addEventListener('click',() => {
+  model={
+    count:6, pins:[6,4,6,2,6,5], edges:[
+      [{to:6,direction:'opposite'}],
+      [],
+      [{to:6,direction:'same'},{to:4,direction:'opposite'},{to:5,direction:'opposite'}],
+      [{to:1,direction:'same'}],
+      [{to:1,direction:'opposite'}],
+      []
+    ].map(e => (e.length?e:[{to:0,direction:'same'}]).map(link => ({...link,id:++rowSerial})))
+  };
+  renderAll();inputsChanged();onSolve();
+});
+renderAll();
+// Default to empty instructions; saved settings are restored automatically.
+clearSolution('Set up plate connections and click “Solve Lock”.');
+</script>
+</body>
+</html>
